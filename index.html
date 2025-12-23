@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridForecast - Energy Load Prediction MLOps Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --border-color: #2a2a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --accent-1: #f59e0b;
+            --accent-2: #d97706;
+            --accent-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #3b82f6;
+            --solar: #fbbf24;
+            --wind: #60a5fa;
+            --nuclear: #a78bfa;
+            --hydro: #34d399;
+        }
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .bg-effects {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .grid-bg {
+            position: absolute;
+            width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(rgba(245, 158, 11, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(245, 158, 11, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        .gradient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+        }
+        .orb-1 { width: 400px; height: 400px; background: var(--accent-1); top: -100px; right: -100px; }
+        .orb-2 { width: 300px; height: 300px; background: var(--success); bottom: -50px; left: -50px; }
+        .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        header { text-align: center; margin-bottom: 3rem; }
+        .logo { display: inline-flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+        .logo-icon {
+            width: 48px; height: 48px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+        }
+        .logo-text {
+            font-size: 1.75rem; font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: var(--text-secondary); font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+        .badge {
+            display: inline-block; padding: 0.25rem 0.75rem;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 20px; font-size: 0.75rem; color: var(--accent-1);
+            margin-top: 1rem;
+        }
+        .tabs {
+            display: flex; gap: 0.5rem; margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem; flex-wrap: wrap;
+        }
+        .tab {
+            padding: 0.75rem 1.5rem; background: transparent; border: none;
+            color: var(--text-secondary); cursor: pointer; font-size: 0.9rem;
+            font-family: inherit; border-radius: 8px 8px 0 0; transition: all 0.3s ease;
+        }
+        .tab:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
+        .tab.active { color: var(--accent-1); background: rgba(245, 158, 11, 0.1); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px; padding: 1.5rem;
+        }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 1rem;
+        }
+        .card-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--success); animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 1.25rem; text-align: center;
+        }
+        .metric-value {
+            font-size: 2rem; font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .metric-label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent-gradient);
+            border: none; border-radius: 8px;
+            color: white; font-family: inherit; font-weight: 500;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3); }
+        .forecast-display {
+            background: var(--bg-secondary);
+            border-radius: 12px; padding: 1.5rem;
+            text-align: center;
+        }
+        .forecast-value {
+            font-size: 4rem; font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .forecast-unit { font-size: 1.5rem; color: var(--text-secondary); }
+        .confidence-band {
+            display: flex; justify-content: center; gap: 2rem;
+            margin-top: 1rem; font-size: 0.9rem;
+        }
+        .confidence-item { text-align: center; }
+        .confidence-label { color: var(--text-secondary); font-size: 0.75rem; }
+        .energy-mix {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 1rem; margin-top: 1.5rem;
+        }
+        .energy-source {
+            text-align: center; padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+        .energy-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .energy-value { font-size: 1.25rem; font-weight: 700; }
+        .energy-label { font-size: 0.75rem; color: var(--text-secondary); }
+        .forecast-chart {
+            background: var(--bg-secondary);
+            border-radius: 8px; height: 280px;
+            position: relative; overflow: hidden;
+        }
+        .weather-panel {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 1rem; margin-top: 1rem;
+        }
+        .weather-item {
+            text-align: center; padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+        .weather-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+        .weather-value { font-size: 1.25rem; font-weight: 600; }
+        .weather-label { font-size: 0.7rem; color: var(--text-secondary); }
+        .stream-container {
+            height: 350px; overflow-y: auto;
+            background: var(--bg-secondary);
+            border-radius: 8px; padding: 1rem;
+        }
+        .stream-item {
+            display: flex; align-items: center; gap: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-card);
+            border-radius: 8px; margin-bottom: 0.5rem;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .stream-time-col { min-width: 60px; font-size: 0.8rem; color: var(--text-secondary); }
+        .stream-forecast {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600; min-width: 100px;
+        }
+        .stream-actual { font-family: 'IBM Plex Mono', monospace; min-width: 100px; }
+        .stream-error {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem; min-width: 80px;
+        }
+        .stream-bar { flex: 1; height: 8px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; }
+        .stream-fill { height: 100%; border-radius: 4px; }
+        .region-selector {
+            display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;
+        }
+        .region-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; color: var(--text-secondary);
+            cursor: pointer; font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        .region-btn:hover, .region-btn.active {
+            border-color: var(--accent-1);
+            color: var(--accent-1);
+            background: rgba(245, 158, 11, 0.1);
+        }
+        .pipeline-status {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 1rem; margin-top: 1rem;
+        }
+        .pipeline-step {
+            text-align: center; padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            position: relative;
+        }
+        .pipeline-step::after {
+            content: '→';
+            position: absolute;
+            right: -0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent-1);
+        }
+        .pipeline-step:last-child::after { display: none; }
+        .pipeline-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .pipeline-label { font-size: 0.75rem; color: var(--text-secondary); }
+        .pipeline-status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 0.25rem;
+        }
+        .architecture-diagram {
+            background: var(--bg-secondary);
+            border-radius: 12px; padding: 2rem; text-align: center;
+        }
+        .arch-flow {
+            display: flex; align-items: center; justify-content: center;
+            gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+        }
+        .arch-box {
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; min-width: 130px;
+        }
+        .arch-box.highlight {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+        }
+        .arch-arrow { font-size: 1.5rem; color: var(--accent-1); }
+        footer { text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 0.85rem; }
+        @media (max-width: 768px) {
+            .grid-2, .grid-3, .grid-4, .metrics-grid, .energy-mix, .weather-panel, .pipeline-status { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-effects">
+        <div class="grid-bg"></div>
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <span class="logo-text">GridForecast</span>
+            </div>
+            <p class="subtitle">Energy Load Prediction MLOps Platform — Accurate forecasts for grid stability</p>
+            <span class="badge">Built for RTE France Grid Operations</span>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="demo">Load Forecaster</button>
+            <button class="tab" data-tab="stream">Real-Time Monitor</button>
+            <button class="tab" data-tab="pipeline">MLOps Pipeline</button>
+            <button class="tab" data-tab="metrics">Performance</button>
+            <button class="tab" data-tab="architecture">Architecture</button>
+        </div>
+
+        <!-- Demo Tab -->
+        <div id="demo" class="tab-content active">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">
+                            <span class="status-dot"></span>
+                            24-Hour Load Forecast
+                        </span>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Updated: 5 min ago</span>
+                    </div>
+
+                    <div class="region-selector">
+                        <button class="region-btn active" onclick="selectRegion('france')">🇫🇷 France</button>
+                        <button class="region-btn" onclick="selectRegion('idf')">Paris Region</button>
+                        <button class="region-btn" onclick="selectRegion('paca')">PACA</button>
+                        <button class="region-btn" onclick="selectRegion('grandest')">Grand Est</button>
+                    </div>
+
+                    <div class="forecast-display">
+                        <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                            Peak Load Forecast (Tomorrow 19:00)
+                        </div>
+                        <div class="forecast-value" id="forecastValue">67.4</div>
+                        <div class="forecast-unit">GW</div>
+                        
+                        <div class="confidence-band">
+                            <div class="confidence-item">
+                                <div style="color: var(--info);">64.2 GW</div>
+                                <div class="confidence-label">P10</div>
+                            </div>
+                            <div class="confidence-item">
+                                <div style="color: var(--accent-1); font-weight: 600;">67.4 GW</div>
+                                <div class="confidence-label">Median</div>
+                            </div>
+                            <div class="confidence-item">
+                                <div style="color: var(--error);">71.8 GW</div>
+                                <div class="confidence-label">P90</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="weather-panel">
+                        <div class="weather-item">
+                            <div class="weather-icon">🌡️</div>
+                            <div class="weather-value">8°C</div>
+                            <div class="weather-label">Temperature</div>
+                        </div>
+                        <div class="weather-item">
+                            <div class="weather-icon">☁️</div>
+                            <div class="weather-value">65%</div>
+                            <div class="weather-label">Cloud Cover</div>
+                        </div>
+                        <div class="weather-item">
+                            <div class="weather-icon">💨</div>
+                            <div class="weather-value">24 km/h</div>
+                            <div class="weather-label">Wind Speed</div>
+                        </div>
+                        <div class="weather-item">
+                            <div class="weather-icon">☀️</div>
+                            <div class="weather-value">3.2h</div>
+                            <div class="weather-label">Sun Hours</div>
+                        </div>
+                    </div>
+
+                    <button class="btn" onclick="generateForecast()" style="width: 100%; margin-top: 1rem;">🔄 Refresh Forecast</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📊 24-Hour Forecast Curve</span>
+                    </div>
+                    <div class="forecast-chart">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+
+                    <div style="margin-top: 1rem; font-weight: 600; margin-bottom: 0.75rem;">⚡ Predicted Energy Mix</div>
+                    <div class="energy-mix">
+                        <div class="energy-source">
+                            <div class="energy-icon">☢️</div>
+                            <div class="energy-value" style="color: var(--nuclear);">42.1 GW</div>
+                            <div class="energy-label">Nuclear (63%)</div>
+                        </div>
+                        <div class="energy-source">
+                            <div class="energy-icon">💨</div>
+                            <div class="energy-value" style="color: var(--wind);">8.7 GW</div>
+                            <div class="energy-label">Wind (13%)</div>
+                        </div>
+                        <div class="energy-source">
+                            <div class="energy-icon">☀️</div>
+                            <div class="energy-value" style="color: var(--solar);">5.2 GW</div>
+                            <div class="energy-label">Solar (8%)</div>
+                        </div>
+                        <div class="energy-source">
+                            <div class="energy-icon">💧</div>
+                            <div class="energy-value" style="color: var(--hydro);">11.4 GW</div>
+                            <div class="energy-label">Hydro (16%)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stream Tab -->
+        <div id="stream" class="tab-content">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="currentLoad">64.2</div>
+                    <div class="metric-label">Current Load (GW)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" style="color: var(--success);" id="mapeValue">2.3%</div>
+                    <div class="metric-label">MAPE (24h)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="forecastCount">0</div>
+                    <div class="metric-label">Forecasts Today</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">148ms</div>
+                    <div class="metric-label">Avg Latency</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">
+                            <span class="status-dot"></span>
+                            Forecast vs Actual Stream
+                        </span>
+                        <button class="btn" onclick="toggleStream()" id="streamBtn">Start Monitor</button>
+                    </div>
+                    <div class="stream-container" id="streamContainer">
+                        <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Click "Start Monitor" to begin real-time tracking</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📈 Forecast Accuracy (Last 7 Days)</span>
+                    </div>
+                    <canvas id="accuracyChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Tab -->
+        <div id="pipeline" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">🔄 MLOps Pipeline Status</span>
+                    <span style="color: var(--success); font-size: 0.85rem;">All systems operational</span>
+                </div>
+
+                <div class="pipeline-status">
+                    <div class="pipeline-step">
+                        <div class="pipeline-icon">📥</div>
+                        <div style="font-weight: 600;">Data Ingestion</div>
+                        <div class="pipeline-label">RTE API + ERA5 <span class="pipeline-status-dot" style="background: var(--success);"></span></div>
+                    </div>
+                    <div class="pipeline-step">
+                        <div class="pipeline-icon">⚙️</div>
+                        <div style="font-weight: 600;">Feature Pipeline</div>
+                        <div class="pipeline-label">Airflow DAG <span class="pipeline-status-dot" style="background: var(--success);"></span></div>
+                    </div>
+                    <div class="pipeline-step">
+                        <div class="pipeline-icon">🧠</div>
+                        <div style="font-weight: 600;">Model Training</div>
+                        <div class="pipeline-label">Kubeflow <span class="pipeline-status-dot" style="background: var(--success);"></span></div>
+                    </div>
+                    <div class="pipeline-step">
+                        <div class="pipeline-icon">🚀</div>
+                        <div style="font-weight: 600;">Deployment</div>
+                        <div class="pipeline-label">K8s Rollout <span class="pipeline-status-dot" style="background: var(--success);"></span></div>
+                    </div>
+                    <div class="pipeline-step">
+                        <div class="pipeline-icon">📊</div>
+                        <div style="font-weight: 600;">Monitoring</div>
+                        <div class="pipeline-label">Grafana <span class="pipeline-status-dot" style="background: var(--success);"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 1.5rem;">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📅 Scheduled Jobs (Airflow)</span>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 0.5rem;">
+                            <span>feature_engineering_daily</span>
+                            <span style="color: var(--success);">✓ Success</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 0.5rem;">
+                            <span>model_retraining_weekly</span>
+                            <span style="color: var(--success);">✓ Success</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 0.5rem;">
+                            <span>batch_inference_hourly</span>
+                            <span style="color: var(--warning);">⏳ Running</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
+                            <span>drift_detection_daily</span>
+                            <span style="color: var(--success);">✓ Success</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📦 Model Registry (MLflow)</span>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <div style="padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; margin-bottom: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 600;">load_forecast_v3.2.1</span>
+                                <span style="color: var(--success); font-size: 0.8rem;">Production</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">MAPE: 2.31% | Deployed: 3 days ago</div>
+                        </div>
+                        <div style="padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; margin-bottom: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 600;">load_forecast_v3.3.0</span>
+                                <span style="color: var(--info); font-size: 0.8rem;">Staging</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">MAPE: 2.18% | A/B testing: 10% traffic</div>
+                        </div>
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 600;">load_forecast_v3.1.0</span>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem;">Archived</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">MAPE: 2.54% | Replaced: 2 weeks ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Tab -->
+        <div id="metrics" class="tab-content">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">2.31%</div>
+                    <div class="metric-label">MAPE</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0.94</div>
+                    <div class="metric-label">R² Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">148ms</div>
+                    <div class="metric-label">P95 Latency</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">99.8%</div>
+                    <div class="metric-label">Uptime</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🎯 Model Performance by Horizon</span>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 0.75rem; text-align: left; color: var(--text-secondary);">Forecast Horizon</th>
+                                <th style="padding: 0.75rem; text-align: center; color: var(--text-secondary);">MAPE</th>
+                                <th style="padding: 0.75rem; text-align: center; color: var(--text-secondary);">RMSE</th>
+                                <th style="padding: 0.75rem; text-align: center; color: var(--text-secondary);">R²</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75rem;">1 Hour</td>
+                                <td style="padding: 0.75rem; text-align: center; color: var(--success);">1.2%</td>
+                                <td style="padding: 0.75rem; text-align: center;">0.78 GW</td>
+                                <td style="padding: 0.75rem; text-align: center;">0.98</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75rem;">6 Hours</td>
+                                <td style="padding: 0.75rem; text-align: center; color: var(--success);">1.8%</td>
+                                <td style="padding: 0.75rem; text-align: center;">1.24 GW</td>
+                                <td style="padding: 0.75rem; text-align: center;">0.96</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75rem;">24 Hours</td>
+                                <td style="padding: 0.75rem; text-align: center; color: var(--success);">2.3%</td>
+                                <td style="padding: 0.75rem; text-align: center;">1.67 GW</td>
+                                <td style="padding: 0.75rem; text-align: center;">0.94</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75rem;">48 Hours</td>
+                                <td style="padding: 0.75rem; text-align: center; color: var(--warning);">3.1%</td>
+                                <td style="padding: 0.75rem; text-align: center;">2.18 GW</td>
+                                <td style="padding: 0.75rem; text-align: center;">0.91</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 0.75rem;">7 Days</td>
+                                <td style="padding: 0.75rem; text-align: center; color: var(--warning);">4.8%</td>
+                                <td style="padding: 0.75rem; text-align: center;">3.42 GW</td>
+                                <td style="padding: 0.75rem; text-align: center;">0.85</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">💰 Business Impact</span>
+                    </div>
+                    <div class="grid-2" style="gap: 1rem; margin-top: 1rem;">
+                        <div style="text-align: center; padding: 1.25rem; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                            <div style="font-size: 1.75rem; font-weight: 700; color: var(--success);">€4.2M</div>
+                            <div style="color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.85rem;">Annual Savings</div>
+                        </div>
+                        <div style="text-align: center; padding: 1.25rem; background: rgba(59, 130, 246, 0.1); border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.3);">
+                            <div style="font-size: 1.75rem; font-weight: 700; color: var(--info);">-34%</div>
+                            <div style="color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.85rem;">Forecast Error</div>
+                        </div>
+                        <div style="text-align: center; padding: 1.25rem; background: rgba(139, 92, 246, 0.1); border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.3);">
+                            <div style="font-size: 1.75rem; font-weight: 700; color: #8b5cf6;">-12%</div>
+                            <div style="color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.85rem;">CO₂ Emissions</div>
+                        </div>
+                        <div style="text-align: center; padding: 1.25rem; background: rgba(245, 158, 11, 0.1); border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.3);">
+                            <div style="font-size: 1.75rem; font-weight: 700; color: var(--warning);">+18%</div>
+                            <div style="color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.85rem;">Renewable Integration</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Architecture Tab -->
+        <div id="architecture" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">🏗️ System Architecture</span>
+                </div>
+                <div class="architecture-diagram">
+                    <div class="arch-flow">
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">🌍</div>
+                            <div style="font-weight: 600;">RTE API</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">eCO2mix data</div>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">🌤️</div>
+                            <div style="font-weight: 600;">ERA5 Weather</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">ECMWF data</div>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-box highlight">
+                            <div style="font-size: 1.5rem;">⚙️</div>
+                            <div style="font-weight: 600;">Feature Store</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Feast</div>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">🧠</div>
+                            <div style="font-weight: 600;">Ensemble</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">LightGBM + TFT</div>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-box highlight">
+                            <div style="font-size: 1.5rem;">📡</div>
+                            <div style="font-weight: 600;">API</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">FastAPI</div>
+                        </div>
+                    </div>
+                    <div style="margin: 2rem 0;"><div class="arch-arrow" style="transform: rotate(90deg);">↓</div></div>
+                    <div class="arch-flow">
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">🔄</div>
+                            <div style="font-weight: 600;">Airflow</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Orchestration</div>
+                        </div>
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">📦</div>
+                            <div style="font-weight: 600;">MLflow</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Registry</div>
+                        </div>
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">📊</div>
+                            <div style="font-weight: 600;">Grafana</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Monitoring</div>
+                        </div>
+                        <div class="arch-box">
+                            <div style="font-size: 1.5rem;">☸️</div>
+                            <div style="font-weight: 600;">Kubernetes</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">GKE</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-3" style="margin-top: 2rem;">
+                    <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <h4 style="color: var(--accent-1); margin-bottom: 0.5rem;">Data Sources</h4>
+                        <ul style="font-size: 0.8rem; color: var(--text-secondary); list-style: none;">
+                            <li>• RTE eCO2mix (load data)</li>
+                            <li>• ERA5 weather reanalysis</li>
+                            <li>• Calendar features</li>
+                            <li>• Price signals</li>
+                            <li>• Capacity factors</li>
+                        </ul>
+                    </div>
+                    <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <h4 style="color: var(--accent-1); margin-bottom: 0.5rem;">Model Stack</h4>
+                        <ul style="font-size: 0.8rem; color: var(--text-secondary); list-style: none;">
+                            <li>• LightGBM (short-term)</li>
+                            <li>• Temporal Fusion Transformer</li>
+                            <li>• XGBoost (features)</li>
+                            <li>• Ensemble voting</li>
+                            <li>• Quantile regression</li>
+                        </ul>
+                    </div>
+                    <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <h4 style="color: var(--accent-1); margin-bottom: 0.5rem;">Infrastructure</h4>
+                        <ul style="font-size: 0.8rem; color: var(--text-secondary); list-style: none;">
+                            <li>• Google Cloud Platform</li>
+                            <li>• Kubernetes (GKE)</li>
+                            <li>• BigQuery (data lake)</li>
+                            <li>• Prometheus + Grafana</li>
+                            <li>• Terraform IaC</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            Built by Sam Pentakamal · GridForecast MLOps Platform · 2025
+        </footer>
+    </div>
+
+    <script>
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        const regionData = {
+            'france': { peak: 67.4, low: 64.2, high: 71.8 },
+            'idf': { peak: 12.8, low: 12.1, high: 13.6 },
+            'paca': { peak: 8.2, low: 7.8, high: 8.9 },
+            'grandest': { peak: 6.4, low: 6.0, high: 6.9 }
+        };
+
+        function selectRegion(region) {
+            document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const data = regionData[region];
+            document.getElementById('forecastValue').textContent = data.peak;
+        }
+
+        function generateForecast() {
+            const variation = (Math.random() - 0.5) * 4;
+            const newForecast = (67.4 + variation).toFixed(1);
+            document.getElementById('forecastValue').textContent = newForecast;
+        }
+
+        // Stream
+        let streamRunning = false;
+        let streamInterval;
+        let forecastCount = 0;
+
+        function toggleStream() {
+            const btn = document.getElementById('streamBtn');
+            const container = document.getElementById('streamContainer');
+
+            if (streamRunning) {
+                streamRunning = false;
+                clearInterval(streamInterval);
+                btn.textContent = 'Start Monitor';
+            } else {
+                streamRunning = true;
+                btn.textContent = 'Stop Monitor';
+                container.innerHTML = '';
+
+                streamInterval = setInterval(() => {
+                    forecastCount++;
+                    const forecast = (60 + Math.random() * 15).toFixed(1);
+                    const actual = (parseFloat(forecast) + (Math.random() - 0.5) * 3).toFixed(1);
+                    const error = ((Math.abs(forecast - actual) / actual) * 100).toFixed(2);
+                    const time = new Date().toLocaleTimeString();
+
+                    document.getElementById('forecastCount').textContent = forecastCount;
+                    document.getElementById('currentLoad').textContent = actual;
+                    
+                    const errorNum = parseFloat(error);
+                    const errorColor = errorNum < 2 ? 'var(--success)' : errorNum < 4 ? 'var(--warning)' : 'var(--error)';
+
+                    container.innerHTML = `
+                        <div class="stream-item">
+                            <span class="stream-time-col">${time}</span>
+                            <span class="stream-forecast" style="color: var(--accent-1);">${forecast} GW</span>
+                            <span class="stream-actual">${actual} GW</span>
+                            <span class="stream-error" style="color: ${errorColor};">${error}%</span>
+                            <div class="stream-bar">
+                                <div class="stream-fill" style="width: ${100 - errorNum * 10}%; background: ${errorColor};"></div>
+                            </div>
+                        </div>
+                    ` + container.innerHTML;
+
+                    const items = container.querySelectorAll('.stream-item');
+                    if (items.length > 12) items[items.length - 1].remove();
+                }, 2000);
+            }
+        }
+
+        // Draw forecast chart
+        setTimeout(() => {
+            const canvas = document.getElementById('forecastChart');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width = canvas.parentElement.offsetWidth;
+                const height = canvas.height = 280;
+
+                // Generate 24-hour data
+                const hours = Array.from({ length: 24 }, (_, i) => i);
+                const load = [52, 48, 45, 44, 45, 48, 55, 62, 65, 64, 63, 62, 61, 60, 59, 61, 64, 67, 68, 66, 62, 58, 55, 53];
+
+                const minL = Math.min(...load) - 5;
+                const maxL = Math.max(...load) + 5;
+
+                // Grid
+                ctx.strokeStyle = '#2a2a3a';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 4; i++) {
+                    const y = 20 + (height - 60) * (i / 4);
+                    ctx.beginPath();
+                    ctx.moveTo(40, y);
+                    ctx.lineTo(width - 20, y);
+                    ctx.stroke();
+                }
+
+                // Confidence band
+                ctx.fillStyle = 'rgba(245, 158, 11, 0.1)';
+                ctx.beginPath();
+                load.forEach((l, i) => {
+                    const x = 40 + (i / 23) * (width - 60);
+                    const y = 20 + ((maxL - (l + 3)) / (maxL - minL)) * (height - 60);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                load.slice().reverse().forEach((l, i) => {
+                    const x = 40 + ((23 - i) / 23) * (width - 60);
+                    const y = 20 + ((maxL - (l - 3)) / (maxL - minL)) * (height - 60);
+                    ctx.lineTo(x, y);
+                });
+                ctx.closePath();
+                ctx.fill();
+
+                // Line
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                load.forEach((l, i) => {
+                    const x = 40 + (i / 23) * (width - 60);
+                    const y = 20 + ((maxL - l) / (maxL - minL)) * (height - 60);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+
+                // Peak marker
+                const peakIdx = load.indexOf(Math.max(...load));
+                const peakX = 40 + (peakIdx / 23) * (width - 60);
+                const peakY = 20 + ((maxL - load[peakIdx]) / (maxL - minL)) * (height - 60);
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(peakX, peakY, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Labels
+                ctx.fillStyle = '#a0a0b0';
+                ctx.font = '10px IBM Plex Sans';
+                ctx.fillText('00:00', 40, height - 10);
+                ctx.fillText('12:00', width / 2, height - 10);
+                ctx.fillText('23:00', width - 50, height - 10);
+                ctx.fillText('GW', 10, 20);
+            }
+        }, 100);
+    </script>
+</body>
+</html>
